@@ -589,8 +589,8 @@ els.menuClearHistory.addEventListener("click", () => {
 
 els.menuShareWhatsapp.addEventListener("click", shareWhatsApp);
 
-function shareWhatsApp() {
-  let text;
+function buildShareText() {
+  const appUrl = window.location.href;
   if (state.results.length > 0) {
     const top = state.results.slice(0, 5);
     const lines = top.map((p) => {
@@ -598,10 +598,44 @@ function shareWhatsApp() {
       const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}`;
       return `${def.icon} ${p.name} — ${formatDistance(p.dist)}\n${mapsUrl}`;
     });
-    text = `Encontré estos lugares cerca con Cerca 📍:\n\n${lines.join("\n\n")}`;
-  } else {
-    text = "Mirá esta app para encontrar bares, cafés, parrillas y más cerca tuyo: Cerca 📍";
+    return `Encontré estos lugares cerca con Cerca 📍:\n\n${lines.join("\n\n")}\n\nBuscá vos también 👉 ${appUrl}`;
   }
+  return `Mirá esta app para encontrar bares, cafés, parrillas y más cerca tuyo 📍\n${appUrl}`;
+}
+
+async function shareWhatsApp() {
+  const appUrl = window.location.href;
+  const text = buildShareText();
+
+  // 1) Intento con Web Share API nativo: permite adjuntar la imagen de la app
+  //    junto con el texto y elegir WhatsApp desde el selector del sistema.
+  if (navigator.share) {
+    try {
+      let file = null;
+      try {
+        const resp = await fetch("icons/icon-512.png");
+        const blob = await resp.blob();
+        const candidate = new File([blob], "cerca.png", { type: blob.type || "image/png" });
+        if (navigator.canShare && navigator.canShare({ files: [candidate] })) {
+          file = candidate;
+        }
+      } catch (imgErr) {
+        console.warn("No se pudo adjuntar la imagen", imgErr);
+      }
+
+      const shareData = file
+        ? { title: "Cerca", text, files: [file] }
+        : { title: "Cerca", text, url: appUrl };
+
+      await navigator.share(shareData);
+      return;
+    } catch (err) {
+      if (err && err.name === "AbortError") return; // el usuario canceló, no hacer fallback
+    }
+  }
+
+  // 2) Fallback: link directo a WhatsApp Web/app (solo texto, sin imagen —
+  //    wa.me no admite adjuntar archivos, es una limitación de WhatsApp).
   const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
   window.open(url, "_blank", "noopener");
 }

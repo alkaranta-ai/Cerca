@@ -188,10 +188,10 @@ function setView(view) {
 }
 
 // ---------- Buscar ----------
-els.searchBtn.addEventListener("click", runSearch);
+els.searchBtn.addEventListener("click", () => runSearch());
 
 async function runSearch(overrides) {
-  if (overrides) {
+  if (overrides && Array.isArray(overrides.cats)) {
     state.selected = new Set(overrides.cats || []);
     state.radius = overrides.radius || state.radius;
     els.radius.value = state.radius;

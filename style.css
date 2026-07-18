@@ -515,7 +515,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ─── Cards de resultados ─── */
-.results { display: flex; flex-direction: column; gap: 8px; }
+.results { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 
 .place-card {
   display: flex;
@@ -618,7 +618,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ─── Mapa ─── */
-.map-wrap { overflow: hidden; padding: 0; }
+.map-wrap { overflow: hidden; padding: 0; margin-top: 10px; }
 #map { height: 60vh; min-height: 360px; width: 100%; border-radius: var(--radius-lg); }
 
 .leaflet-popup-content-wrapper {
@@ -1085,6 +1085,7 @@ body.dark {
   width: 100%;
   text-align: left;
   padding: 14px 16px;
+  margin: 14px 0 0;
   border: none;
   cursor: pointer;
   color: var(--ink);

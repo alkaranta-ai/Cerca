@@ -156,10 +156,12 @@ const els = {
   searchBtnLabel: document.getElementById("searchBtnLabel"),
   statusBox: document.getElementById("statusBox"),
   viewToggle: document.getElementById("viewToggle"),
+  viewToggleThumb: document.getElementById("viewToggleThumb"),
   resultsView: document.getElementById("resultsView"),
   mapView: document.getElementById("mapView"),
 
   dock: document.getElementById("dock"),
+  dockThumb: document.getElementById("dockThumb"),
   historyBadge: document.getElementById("historyBadge"),
   favBadge: document.getElementById("favBadge"),
   viewInicio: document.getElementById("view-inicio"),
@@ -214,6 +216,22 @@ const els = {
   sheetContent: document.getElementById("sheetContent"),
 };
 
+// ---------- UI: thumb deslizante de vidrio (dock / view-toggle) ----------
+function slideGlassThumb(container, thumb, activeBtn) {
+  if (!container || !thumb || !activeBtn) return;
+  const cRect = container.getBoundingClientRect();
+  const bRect = activeBtn.getBoundingClientRect();
+  const x = bRect.left - cRect.left;
+  thumb.style.width = `${bRect.width}px`;
+  thumb.style.transform = `translateX(${x}px)`;
+}
+window.addEventListener("resize", () => {
+  const activeDock = els.dock.querySelector(".dock-item.active");
+  if (activeDock) slideGlassThumb(els.dock, els.dockThumb, activeDock);
+  const activeToggle = els.viewToggle.querySelector(".toggle-btn.active");
+  if (activeToggle && !els.viewToggle.hidden) slideGlassThumb(els.viewToggle, els.viewToggleThumb, activeToggle);
+});
+
 // ---------- UI: tarjetas de categoría ----------
 els.chips.addEventListener("click", (e) => {
   const card = e.target.closest(".cat-card");
@@ -240,6 +258,8 @@ function switchTab(tab) {
   document.querySelectorAll(".dock-item").forEach((b) => {
     b.classList.toggle("active", b.dataset.view === tab);
   });
+  const activeDock = els.dock.querySelector(".dock-item.active");
+  slideGlassThumb(els.dock, els.dockThumb, activeDock);
   els.viewInicio.hidden = tab !== "inicio";
   els.viewBusquedas.hidden = tab !== "busquedas";
   els.viewFavoritos.hidden = tab !== "favoritos";
@@ -271,8 +291,14 @@ function setView(view) {
   document.querySelectorAll(".toggle-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.view === view);
   });
+  const activeToggle = els.viewToggle.querySelector(".toggle-btn.active");
+  slideGlassThumb(els.viewToggle, els.viewToggleThumb, activeToggle);
   els.resultsView.hidden = view !== "list";
   els.mapView.hidden = view !== "map";
+  const shown = view === "list" ? els.resultsView : els.mapView;
+  shown.classList.remove("view-fade-in");
+  void shown.offsetWidth;
+  shown.classList.add("view-fade-in");
   if (view === "map") {
     initMapIfNeeded();
     setTimeout(() => state.map && state.map.invalidateSize(), 50);
@@ -1991,6 +2017,11 @@ if (state.settings.defaultCats && state.settings.defaultCats.length) {
 
 state.car = loadCar();
 updateCarMenuItem();
+
+requestAnimationFrame(() => {
+  const activeDock = els.dock.querySelector(".dock-item.active");
+  slideGlassThumb(els.dock, els.dockThumb, activeDock);
+});
 
 const cachedSuggestion = loadCachedSuggestion();
 if (cachedSuggestion) showSuggestionResult(cachedSuggestion);

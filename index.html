@@ -127,6 +127,7 @@
   <section id="view-busquedas" class="app-view" hidden>
 
     <div class="view-toggle glass-panel" id="viewToggle" hidden>
+      <div class="glass-thumb" id="viewToggleThumb" aria-hidden="true"></div>
       <button class="toggle-btn active" data-view="list">Lista</button>
       <button class="toggle-btn" data-view="map">Mapa</button>
     </div>
@@ -289,6 +290,7 @@
 
 <!-- ================= DOCK INFERIOR ================= -->
 <nav class="dock glass-panel" id="dock" aria-label="Navegación principal">
+  <div class="glass-thumb" id="dockThumb" aria-hidden="true"></div>
   <button class="dock-item active" data-view="inicio">
     <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M4 11.5L12 4L20 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10V20H18V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <span>Inicio</span>

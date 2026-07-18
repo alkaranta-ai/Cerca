@@ -343,9 +343,9 @@ async function runSearch(overrides) {
     renderResults();
 
     if (state.lastSearchWasCache) {
-      setStatus("Resultados desde caché ⚡ (misma zona hace poco, no volvimos a consultar OSM)");
+      setStatus("Resultados desde caché (misma zona hace poco, no volvimos a consultar OSM)", "cached");
     } else if (state.lastSearchWasOffline) {
-      setStatus("Sin conexión: te mostramos tu última búsqueda guardada 📴");
+      setStatus("Sin conexión: te mostramos tu última búsqueda guardada", "offline");
     } else {
       setStatus("");
     }
@@ -365,7 +365,7 @@ async function runSearch(overrides) {
     });
   } catch (err) {
     console.error(err);
-    setStatus(errorMessage(err), true);
+    setStatus(errorMessage(err), "error");
     showToast(errorMessage(err));
     if (!els.resultsView.hidden && els.resultsView.querySelector(".skeleton-card")) {
       els.resultsView.innerHTML = `<div class="empty-state">${escapeHtml(errorMessage(err))}</div>`;
@@ -436,9 +436,16 @@ function showRadarStatus() {
   `;
 }
 
-function setStatus(msg, isError = false) {
-  els.statusBox.classList.toggle("error", isError);
-  els.statusBox.textContent = msg;
+function setStatus(msg, variant) {
+  els.statusBox.classList.remove("error", "cached", "offline");
+  if (variant) els.statusBox.classList.add(variant);
+  if (variant === "cached") {
+    els.statusBox.innerHTML = `<span aria-hidden="true">⚡</span><span>${escapeHtml(msg)}</span>`;
+  } else if (variant === "offline") {
+    els.statusBox.innerHTML = `<span aria-hidden="true">📴</span><span>${escapeHtml(msg)}</span>`;
+  } else {
+    els.statusBox.textContent = msg;
+  }
 }
 
 // ---------- Caché de resultados por zona ----------
@@ -802,7 +809,7 @@ function renderResults() {
     : `${list.length} de ${state.results.length} lugares`;
 
   els.resultsView.innerHTML = (expandBanner || "") + list
-    .map((p) => {
+    .map((p, i) => {
       const def = CATEGORY_DEFS[p.category] || CATEGORY_DEFS.restaurante;
       const c = p.contact || {};
       const isFav = isFavorite(p.id);
@@ -812,9 +819,10 @@ function renderResults() {
         c.instagram ? "📷" : "",
         c.facebook ? "👍" : "",
       ].filter(Boolean).join(" ");
+      const delay = Math.min(i, 10) * 0.035;
       return `
-        <button class="place-card" type="button" data-id="${p.id}">
-          ${c.photo ? `<div class="place-thumb" style="background-image:url('${c.photo}')"></div>` : `<div class="place-badge ${def.badgeClass}">${def.icon}</div>`}
+        <button class="place-card card-enter" type="button" data-id="${p.id}" style="animation-delay:${delay}s">
+          ${c.photo ? `<div class="place-thumb"><img src="${c.photo}" alt="" loading="lazy" decoding="async" /></div>` : `<div class="place-badge ${def.badgeClass}">${def.icon}</div>`}
           <div class="place-info">
             <p class="place-name">${escapeHtml(p.name)}</p>
             <div class="place-meta">
@@ -1089,9 +1097,9 @@ function updateMapMarkers(fitBounds = true) {
 
   if (fitBounds) {
     if (bounds.length > 1) {
-      state.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
+      state.map.flyToBounds(bounds, { padding: [30, 30], maxZoom: 16, duration: 0.7 });
     } else {
-      state.map.setView([state.userLat, state.userLon], 15);
+      state.map.flyTo([state.userLat, state.userLon], 15, { duration: 0.7 });
     }
   }
 }
@@ -1123,13 +1131,14 @@ function renderClusteredMarkers(points) {
     groups.push(group);
   }
 
-  groups.forEach((group) => {
+  groups.forEach((group, gi) => {
+    const delay = Math.min(gi, 12) * 0.03;
     if (group.length === 1) {
       const p = group[0].p;
       const def = CATEGORY_DEFS[p.category] || CATEGORY_DEFS.restaurante;
       const icon = L.divIcon({
         className: "",
-        html: `<div style="font-size:18px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));">${def.icon}</div>`,
+        html: `<div class="marker-enter" style="font-size:18px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));animation-delay:${delay}s">${def.icon}</div>`,
         iconSize: [24, 24],
         iconAnchor: [12, 12],
       });
@@ -1142,13 +1151,13 @@ function renderClusteredMarkers(points) {
       const center = [latSum / group.length, lonSum / group.length];
       const icon = L.divIcon({
         className: "",
-        html: `<div class="map-cluster">${group.length}</div>`,
+        html: `<div class="map-cluster marker-enter" style="animation-delay:${delay}s">${group.length}</div>`,
         iconSize: [36, 36],
         iconAnchor: [18, 18],
       });
       const marker = L.marker(center, { icon }).addTo(state.markersLayer);
       marker.on("click", () => {
-        state.map.setView(center, Math.min(19, state.map.getZoom() + 2));
+        state.map.flyTo(center, Math.min(19, state.map.getZoom() + 2), { duration: 0.6 });
       });
     }
   });
@@ -1214,16 +1223,27 @@ function toggleFavorite(p, btnEl) {
   }
   saveFavoritesList();
   updateFavBadge();
+  const nowFav = isFavorite(p.id);
   document.querySelectorAll(`[data-fav-id="${p.id}"]`).forEach((el) => {
-    const on = isFavorite(p.id);
-    el.classList.toggle("on", on);
-    el.textContent = on ? "★" : "☆";
+    el.classList.toggle("on", nowFav);
+    el.textContent = nowFav ? "★" : "☆";
+    if (nowFav) {
+      el.classList.remove("pop");
+      void el.offsetWidth;
+      el.classList.add("pop");
+      el.addEventListener("animationend", () => el.classList.remove("pop"), { once: true });
+    }
   });
   const sheetFav = document.getElementById("sheetFavBtn");
   if (sheetFav) {
-    const on = isFavorite(p.id);
-    sheetFav.classList.toggle("on", on);
-    sheetFav.textContent = on ? "★" : "☆";
+    sheetFav.classList.toggle("on", nowFav);
+    sheetFav.textContent = nowFav ? "★" : "☆";
+    if (nowFav) {
+      sheetFav.classList.remove("pop");
+      void sheetFav.offsetWidth;
+      sheetFav.classList.add("pop");
+      sheetFav.addEventListener("animationend", () => sheetFav.classList.remove("pop"), { once: true });
+    }
   }
   if (state.activeTab === "favoritos") renderFavorites();
 }
@@ -1992,4 +2012,26 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW registration failed", e));
   });
+}
+
+// ---------- Warm-up silencioso de GPS ----------
+// Si el usuario ya nos dio permiso de ubicación antes, pedimos la posición
+// apenas abre la app (sin mostrar ningún prompt) para que "Buscar cerca mío"
+// responda más rápido cuando la toque.
+if ("permissions" in navigator && "geolocation" in navigator) {
+  navigator.permissions
+    .query({ name: "geolocation" })
+    .then((status) => {
+      if (status.state === "granted") {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            state.userLat = pos.coords.latitude;
+            state.userLon = pos.coords.longitude;
+          },
+          () => {},
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+        );
+      }
+    })
+    .catch(() => {});
 }

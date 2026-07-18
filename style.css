@@ -351,7 +351,14 @@ main {
 .search-btn:focus-visible,
 .toggle-btn:focus-visible,
 .dock-item:focus-visible,
-.menu-item:focus-visible {
+.menu-item:focus-visible,
+.place-card:focus-visible,
+.fav-star:focus-visible,
+.sheet-fav-star:focus-visible,
+.sheet-close:focus-visible,
+.search-text-row input:focus-visible,
+.sheet-note-input:focus-visible,
+input[type="range"]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -501,6 +508,27 @@ input[type="range"]::-moz-range-thumb {
   min-height: 1.2em;
 }
 .status.error { color: #FF5C3D; }
+.status.cached, .status.offline {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  margin: 12px auto 0;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.status.cached {
+  color: var(--accent);
+  background: var(--accent-dim);
+  box-shadow: inset 0 0 0 1px var(--border-hi);
+}
+.status.offline {
+  color: #928D83;
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
 
 .locate-anim {
   width: 112px; height: 112px;
@@ -642,6 +670,18 @@ input[type="range"]::-moz-range-thumb {
 .place-thumb {
   background-size: cover;
   background-position: center;
+  overflow: hidden;
+  padding: 0;
+}
+.place-thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  animation: thumb-fade-in 0.3s ease-out;
+}
+@keyframes thumb-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .place-icons {
@@ -701,19 +741,53 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ─── Skeleton loaders (mientras esperamos Overpass) ─── */
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
 .skeleton-card { pointer-events: none; cursor: default; }
 .skeleton-block, .skeleton-line {
+  position: relative;
+  overflow: hidden;
   background: var(--surface-3);
   border-radius: var(--radius-sm);
-  animation: skeleton-pulse 1.2s ease-in-out infinite;
 }
+.skeleton-block::after, .skeleton-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(245,166,35,0.14) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+.skeleton-card:nth-child(2) .skeleton-block::after,
+.skeleton-card:nth-child(2) .skeleton-line::after { animation-delay: 0.12s; }
+.skeleton-card:nth-child(3) .skeleton-block::after,
+.skeleton-card:nth-child(3) .skeleton-line::after { animation-delay: 0.24s; }
+.skeleton-card:nth-child(4) .skeleton-block::after,
+.skeleton-card:nth-child(4) .skeleton-line::after { animation-delay: 0.36s; }
+.skeleton-card:nth-child(5) .skeleton-block::after,
+.skeleton-card:nth-child(5) .skeleton-line::after { animation-delay: 0.48s; }
+.skeleton-card:nth-child(6) .skeleton-block::after,
+.skeleton-card:nth-child(6) .skeleton-line::after { animation-delay: 0.6s; }
+@keyframes skeleton-shimmer { to { transform: translateX(100%); } }
 .skeleton-line { height: 10px; border-radius: 5px; }
 .skeleton-line-title { width: 62%; margin-bottom: 8px; }
 .skeleton-line-sub { width: 38%; }
+
+/* ─── Entrada animada de resultados ─── */
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.place-card.card-enter {
+  animation: card-enter 0.32s ease-out backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .place-card.card-enter { animation: none; }
+  .skeleton-block::after, .skeleton-line::after { animation: none; }
+}
 
 /* ─── Banner de sugerencia (ampliar radio, caché, offline) ─── */
 .results-banner {
@@ -1273,6 +1347,15 @@ body.dark {
 }
 .fav-star:active { transform: scale(0.85); }
 .fav-star.on { color: var(--accent); }
+@keyframes fav-pop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.45); }
+  60%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+.fav-star.pop, .sheet-fav-star.pop {
+  animation: fav-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
 
 .sheet-fav-star {
   border: none;
@@ -1410,3 +1493,15 @@ body.dark {
 
 /* ─── Menú: item de auto con estado ─── */
 .menu-item.has-car .menu-item-icon { filter: none; }
+
+/* ─── Entrada animada de markers del mapa ─── */
+@keyframes marker-drop {
+  from { opacity: 0; transform: translateY(-14px) scale(0.6); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.marker-enter {
+  animation: marker-drop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marker-enter { animation: none; }
+}

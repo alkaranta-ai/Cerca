@@ -502,37 +502,72 @@ input[type="range"]::-moz-range-thumb {
 }
 .status.error { color: #FF5C3D; }
 
-.radar-locate {
-  width: 96px; height: 96px;
-  margin: 20px auto 10px;
+.locate-anim {
+  width: 112px; height: 112px;
+  margin: 22px auto 12px;
   position: relative;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.radar-locate::before, .radar-locate::after {
+.locate-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  opacity: 0;
+  animation: locate-ping 2.4s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+}
+.locate-ring:nth-child(2) { animation-delay: 0.8s; }
+.locate-ring:nth-child(3) { animation-delay: 1.6s; }
+@keyframes locate-ping {
+  0%   { transform: scale(0.32); opacity: 0; }
+  12%  { opacity: 0.55; }
+  100% { transform: scale(1); opacity: 0; }
+}
+.locate-orbit {
+  position: absolute;
+  inset: 20%;
+  border-radius: 50%;
+  border: 1px dashed var(--border-hi);
+  animation: locate-spin 7s linear infinite;
+}
+.locate-satellite {
+  position: absolute;
+  inset: 20%;
+  border-radius: 50%;
+  animation: locate-spin 2.6s linear infinite;
+}
+.locate-satellite::after {
   content: "";
   position: absolute;
-  inset: 22%;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-}
-.radar-locate::after { inset: 42%; }
-.radar-sweep {
-  position: absolute; inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(from 0deg, rgba(245,166,35,0.5), transparent 35%);
-  animation: sweep 1.4s linear infinite;
-}
-@keyframes sweep { to { transform: rotate(360deg); } }
-.radar-dot {
-  position: absolute;
+  top: -3px;
+  left: 50%;
   width: 6px; height: 6px;
   border-radius: 50%;
   background: var(--accent);
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 0 12px 4px var(--accent-glow);
+  box-shadow: 0 0 10px 3px var(--accent-glow);
+  transform: translateX(-50%);
+}
+@keyframes locate-spin { to { transform: rotate(360deg); } }
+.locate-core {
+  position: relative;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 16px 6px var(--accent-glow);
+  animation: locate-pulse 1.6s ease-in-out infinite;
+}
+@keyframes locate-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 14px 5px var(--accent-glow); }
+  50%      { transform: scale(1.3); box-shadow: 0 0 26px 10px var(--accent-glow); }
+}
+.locate-label {
+  animation: locate-breathe 1.8s ease-in-out infinite;
+}
+@keyframes locate-breathe {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
 }
 
 /* ─── Segmented toggle ─── */

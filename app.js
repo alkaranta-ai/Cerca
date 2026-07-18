@@ -424,11 +424,15 @@ function getPosition() {
 
 function showRadarStatus() {
   els.statusBox.innerHTML = `
-    <div class="radar-locate" aria-hidden="true">
-      <div class="radar-sweep"></div>
-      <div class="radar-dot"></div>
+    <div class="locate-anim" aria-hidden="true">
+      <div class="locate-ring"></div>
+      <div class="locate-ring"></div>
+      <div class="locate-ring"></div>
+      <div class="locate-orbit"></div>
+      <div class="locate-satellite"></div>
+      <div class="locate-core"></div>
     </div>
-    <div>Buscando tu ubicación…</div>
+    <div class="locate-label">Buscando tu ubicación…</div>
   `;
 }
 

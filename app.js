@@ -108,6 +108,7 @@ const SUGGESTION_KEY = "cerca_suggestion_v1";
 const ZONE_CACHE_KEY = "cerca_zone_cache_v1";
 const LAST_RESULT_KEY = "cerca_last_result_v1";
 const ONBOARDING_KEY = "cerca_onboarding_seen_v1";
+const HIDDEN_PLACES_KEY = "cerca_hidden_places_v1";
 const HISTORY_LIMIT = 30;
 const ZONE_CACHE_TTL_MS = 8 * 60 * 1000; // 8 minutos: evita repegarle a Overpass en la misma zona
 const ZONE_CACHE_MAX_ENTRIES = 15;
@@ -141,10 +142,11 @@ const state = {
   favorites: [],
   notes: {},
   savedSearches: [],
-  settings: { defaultRadius: null, defaultCats: null, accent: "amber", sortBy: "dist", openNowOnly: false },
+  settings: { defaultRadius: null, defaultCats: null, accent: "amber", sortBy: "dist", openNowOnly: false, wheelchairOnly: false },
   searchText: "",
   car: null,
   mapCatFilter: new Set(),
+  hiddenPlaces: new Set(),
   lastQuery: null,
   lastSearchWasCache: false,
   lastSearchWasOffline: false,
@@ -197,9 +199,11 @@ const els = {
   searchText: document.getElementById("searchText"),
   sortSelect: document.getElementById("sortSelect"),
   openNowToggle: document.getElementById("openNowToggle"),
+  wheelchairToggle: document.getElementById("wheelchairToggle"),
   mapCatFilter: document.getElementById("mapCatFilter"),
 
   menuClearHistory: document.getElementById("menuClearHistory"),
+  menuRestoreReported: document.getElementById("menuRestoreReported"),
   menuShareWhatsapp: document.getElementById("menuShareWhatsapp"),
   menuCopyLink: document.getElementById("menuCopyLink"),
   menuExportFavorites: document.getElementById("menuExportFavorites"),
@@ -697,6 +701,7 @@ function buildResults(elements, cats) {
     seen.add(key);
 
     const tags = el.tags || {};
+    if (state.hiddenPlaces.has(key)) return;
     const name = resolveName(tags, classify(tags, cats));
     const category = classify(tags, cats);
     const dist = haversine(state.userLat, state.userLon, lat, lon);
@@ -711,6 +716,7 @@ function buildResults(elements, cats) {
       address: buildAddress(tags),
       contact: buildContact(tags),
       rating: buildRating(tags),
+      wheelchair: tags.wheelchair || "",
     });
   });
 
@@ -901,6 +907,10 @@ function applyFiltersAndSort() {
     list = list.filter((p) => isOpenNow(p.contact && p.contact.opening) !== false);
   }
 
+  if (state.settings.wheelchairOnly) {
+    list = list.filter((p) => p.wheelchair === "yes" || p.wheelchair === "designated" || p.wheelchair === "limited");
+  }
+
   const sortBy = state.settings.sortBy || "dist";
   if (sortBy === "name") {
     list.sort((a, b) => a.name.localeCompare(b.name, "es"));
@@ -962,6 +972,7 @@ function renderResults() {
         c.website ? "🌐" : "",
         c.instagram ? "📷" : "",
         c.facebook ? "👍" : "",
+        (p.wheelchair === "yes" || p.wheelchair === "designated" || p.wheelchair === "limited") ? "♿" : "",
       ].filter(Boolean).join(" ");
       const delay = Math.min(i, 10) * 0.035;
       const openState = isOpenNow(c.opening);
@@ -1082,6 +1093,17 @@ els.openNowToggle.addEventListener("click", () => {
   renderResults();
 });
 
+if (els.wheelchairToggle) {
+  els.wheelchairToggle.addEventListener("click", () => {
+    state.settings.wheelchairOnly = !state.settings.wheelchairOnly;
+    els.wheelchairToggle.classList.toggle("on", state.settings.wheelchairOnly);
+    els.wheelchairToggle.setAttribute("aria-pressed", String(state.settings.wheelchairOnly));
+    saveSettings();
+    state.renderedCount = RESULTS_PAGE_SIZE;
+    renderResults();
+  });
+}
+
 // ---------- Foco accesible del bottom sheet ----------
 let sheetTriggerEl = null;
 function openSheetOverlay() {
@@ -1140,6 +1162,7 @@ function openPlaceSheet(p) {
       <span class="sheet-note-label">Tu nota</span>
       <textarea class="sheet-note-input" id="sheetNoteInput" placeholder="Ej: pedir la de fernet, cerrado los lunes…">${escapeHtml(getNote(p.id))}</textarea>
     </div>
+    <button class="sheet-report-btn" id="sheetReportBtn" type="button">🚫 Reportar cerrado / dato incorrecto</button>
   `;
 
   openSheetOverlay();
@@ -1176,6 +1199,15 @@ function openPlaceSheet(p) {
     noteInput.addEventListener("input", () => {
       clearTimeout(noteTimer);
       noteTimer = setTimeout(() => setNote(p.id, noteInput.value), 300);
+    });
+  }
+
+  const reportBtn = document.getElementById("sheetReportBtn");
+  if (reportBtn) {
+    reportBtn.addEventListener("click", () => {
+      if (confirm(`¿Ocultar "${p.name}" de tus búsquedas? Podés restaurarlo desde el Menú.`)) {
+        reportPlace(p);
+      }
     });
   }
 }
@@ -1400,6 +1432,29 @@ if (els.mapCatFilter) {
 }
 
 // ---------- Favoritos ----------
+// ---------- Lugares reportados (cerrado / dato incorrecto) ----------
+// Se ocultan localmente de futuras búsquedas; no se envía nada a ningún lado.
+function loadHiddenPlaces() {
+  try {
+    const raw = localStorage.getItem(HIDDEN_PLACES_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch (e) { return new Set(); }
+}
+function saveHiddenPlaces() {
+  try {
+    localStorage.setItem(HIDDEN_PLACES_KEY, JSON.stringify([...state.hiddenPlaces]));
+  } catch (e) { /* sin espacio: no es crítico */ }
+}
+function reportPlace(p) {
+  state.hiddenPlaces.add(String(p.id));
+  saveHiddenPlaces();
+  state.results = state.results.filter((r) => String(r.id) !== String(p.id));
+  state.renderedCount = state.renderedCount || RESULTS_PAGE_SIZE;
+  closePlaceSheet();
+  renderResults();
+  showToast("Lo ocultamos de tus búsquedas. ¡Gracias por avisar! 🙏");
+}
+
 function loadFavorites() {
   try {
     const raw = localStorage.getItem(FAVORITES_KEY);
@@ -1948,6 +2003,30 @@ function updateHistoryBadge() {
   els.historyBadge.textContent = n > 99 ? "99+" : String(n);
 }
 
+// ---------- Precarga: mostrar la última búsqueda apenas se abre la app ----------
+// Así el usuario ve algo apenas entra a "Búsquedas", en vez de una pantalla vacía
+// esperando que toque "Buscar cerca mío". No pega a la red: usa lo que ya
+// habíamos guardado la última vez que buscamos con éxito.
+function preloadLastResults() {
+  if (state.results.length > 0) return; // ya hay una búsqueda real cargada
+  const cached = loadLastResult();
+  if (!cached || !cached.elements || !cached.elements.length) return;
+
+  state.userLat = cached.lat;
+  state.userLon = cached.lon;
+  state.results = buildResults(cached.elements, cached.cats);
+  if (state.results.length === 0) return;
+
+  state.mapCatFilter = new Set(cached.cats);
+  state.lastQuery = { cats: cached.cats, radius: cached.radius };
+  state.renderedCount = RESULTS_PAGE_SIZE;
+  renderResults();
+
+  if (els.busquedasIntro) els.busquedasIntro.hidden = true;
+  els.resultsStatus.textContent = `Resultados de ${formatRelativeTime(cached.ts)} · no están actualizados`;
+  els.refreshResultsBtn.hidden = false;
+}
+
 function renderHistory() {
   if (state.history.length === 0) {
     els.historyList.innerHTML = `<div class="empty-history">Todavía no hiciste ninguna búsqueda.<br>Buscá lugares desde Inicio y van a aparecer acá.</div>`;
@@ -2011,6 +2090,20 @@ els.menuClearHistory.addEventListener("click", () => {
     showToast("Historial borrado");
   }
 });
+
+if (els.menuRestoreReported) {
+  els.menuRestoreReported.addEventListener("click", () => {
+    if (state.hiddenPlaces.size === 0) {
+      showToast("No tenés lugares reportados");
+      return;
+    }
+    if (confirm(`¿Restaurar ${state.hiddenPlaces.size} lugar${state.hiddenPlaces.size === 1 ? "" : "es"} que ocultaste?`)) {
+      state.hiddenPlaces.clear();
+      saveHiddenPlaces();
+      showToast("Restaurados. Volvé a buscar para verlos");
+    }
+  });
+}
 
 els.menuShareWhatsapp.addEventListener("click", shareWhatsApp);
 
@@ -2538,6 +2631,12 @@ if (els.openNowToggle) {
   els.openNowToggle.classList.toggle("on", !!state.settings.openNowOnly);
   els.openNowToggle.setAttribute("aria-pressed", String(!!state.settings.openNowOnly));
 }
+if (els.wheelchairToggle) {
+  els.wheelchairToggle.classList.toggle("on", !!state.settings.wheelchairOnly);
+  els.wheelchairToggle.setAttribute("aria-pressed", String(!!state.settings.wheelchairOnly));
+}
+
+state.hiddenPlaces = loadHiddenPlaces();
 
 if (state.settings.defaultRadius) {
   state.radius = state.settings.defaultRadius;
@@ -2567,6 +2666,8 @@ requestAnimationFrame(() => {
 
 const cachedSuggestion = loadCachedSuggestion();
 if (cachedSuggestion) showSuggestionResult(cachedSuggestion);
+
+preloadLastResults();
 
 // ---------- Onboarding (primera vez) ----------
 try {
@@ -2623,3 +2724,23 @@ if ("permissions" in navigator && "geolocation" in navigator) {
     })
     .catch(() => {});
 }
+
+// ---------- Atajos del manifest (shortcuts: mantener presionado el ícono) ----------
+// index.html?action=search -> dispara "Buscar cerca mío" apenas abre
+// index.html?action=car    -> abre directo la ficha de "Cerca del auto"
+(function handleShortcutAction() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get("action");
+    if (!action) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    requestAnimationFrame(() => {
+      if (action === "search" && els.searchBtn) {
+        els.searchBtn.click();
+      } else if (action === "car" && els.menuCar) {
+        switchTab("menu");
+        els.menuCar.click();
+      }
+    });
+  } catch (e) { /* noop */ }
+})();

@@ -1670,6 +1670,23 @@ body.dark {
 }
 .sheet-note-input:focus { outline: none; border-color: var(--border-hi); }
 
+.sheet-report-btn {
+  display: block;
+  width: 100%;
+  margin: 14px 0 2px;
+  padding: 10px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--ink-dim);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  text-align: center;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.sheet-report-btn:hover, .sheet-report-btn:focus-visible { color: var(--status-closed); background: rgba(255,255,255,0.04); outline: none; }
+
 /* ─── Subtítulos de sección (Guardadas / Recientes) ─── */
 .subsection-title {
   font-family: var(--font-display);

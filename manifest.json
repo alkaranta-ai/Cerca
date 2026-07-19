@@ -9,6 +9,22 @@
   "background_color": "#0E0D0B",
   "theme_color": "#0E0D0B",
   "lang": "es-AR",
+  "shortcuts": [
+    {
+      "name": "Buscar cerca mío",
+      "short_name": "Buscar",
+      "description": "Busca lugares cerca de tu ubicación actual",
+      "url": "./index.html?action=search",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Cerca del auto",
+      "short_name": "Auto",
+      "description": "Ver dónde guardaste el auto",
+      "url": "./index.html?action=car",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     {
       "src": "icons/icon-192.png",

@@ -1148,6 +1148,12 @@ function escapeHtml(str) {
 // ---------- Mapa (Leaflet) ----------
 function initMapIfNeeded() {
   if (state.map) return;
+  if (typeof L === "undefined") {
+    // Leaflet no llegó a cargar (CDN bloqueado / sin conexión en ese momento).
+    // No dejamos que esto rompa el resto de la búsqueda.
+    console.warn("Leaflet no está disponible; el mapa queda deshabilitado.");
+    return;
+  }
   state.map = L.map("map", { zoomControl: true });
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "&copy; OpenStreetMap contributors",
@@ -1160,7 +1166,20 @@ function initMapIfNeeded() {
 
 function updateMapMarkers(fitBounds = true) {
   if (!state.userLat) return;
-  initMapIfNeeded();
+  try {
+    initMapIfNeeded();
+  } catch (err) {
+    console.warn("No se pudo inicializar el mapa", err);
+  }
+  if (!state.map || !state.markersLayer) return;
+  try {
+    updateMapMarkersInner(fitBounds);
+  } catch (err) {
+    console.warn("No se pudieron actualizar los marcadores del mapa", err);
+  }
+}
+
+function updateMapMarkersInner(fitBounds) {
   state.markersLayer.clearLayers();
 
   const userIcon = L.divIcon({

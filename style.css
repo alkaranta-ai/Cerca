@@ -980,7 +980,7 @@ input[type="range"]::-moz-range-thumb {
 .refresh-results-btn {
   display: block;
   width: 100%;
-  margin: -4px 0 10px;
+  margin: 10px 0 10px;
   padding: 10px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-hi);
@@ -1496,8 +1496,8 @@ body.dark {
   cursor: pointer;
   color: var(--ink);
   overflow: hidden;
+  box-shadow: 0 0 16px -4px var(--accent-glow);
   transition: transform 0.1s, box-shadow 0.2s;
-  animation: suggestion-breathe 3.2s ease-in-out infinite;
 }
 .suggestion-card::after {
   content: "✨";
@@ -1505,24 +1505,9 @@ body.dark {
   top: 10px;
   right: 16px;
   font-size: 0.8rem;
-  animation: suggestion-sparkle 2.4s ease-in-out infinite;
+  opacity: 0.6;
 }
 .suggestion-card:active { transform: scale(0.98); }
-
-@keyframes suggestion-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
-  50% { box-shadow: 0 0 20px 1px var(--accent-glow); }
-}
-@keyframes suggestion-sparkle {
-  0%, 100% { opacity: 0.2; transform: scale(0.85); }
-  50% { opacity: 0.9; transform: scale(1.15); }
-}
-@keyframes suggestion-wiggle {
-  0%, 88%, 100% { transform: rotate(0deg) scale(1); }
-  91% { transform: rotate(-12deg) scale(1.06); }
-  94% { transform: rotate(10deg) scale(1.06); }
-  97% { transform: rotate(-5deg) scale(1); }
-}
 
 .suggestion-icon {
   font-size: 1.5rem;
@@ -1534,7 +1519,6 @@ body.dark {
   border-radius: 50%;
   background: var(--accent-glass);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 12px var(--accent-glow);
-  animation: suggestion-wiggle 4.5s ease-in-out infinite;
 }
 .suggestion-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .suggestion-title { font-weight: 800; font-size: 0.92rem; color: var(--accent); letter-spacing: 0.01em; }

@@ -510,8 +510,7 @@ function showFoundStatus(count) {
   els.statusBox.classList.remove("error", "cached", "offline");
   els.statusBox.innerHTML = `
     <button type="button" class="found-cta" id="foundCtaBtn">
-      <span class="found-cta-emoji" aria-hidden="true">📍</span>
-      <span class="found-cta-text">${count} lugar${count === 1 ? "" : "es"} encontrado${count === 1 ? "" : "s"}. ¡Mirá los resultados en <strong>Búsquedas</strong>!</span>
+      <span class="found-cta-text"><span class="found-cta-emoji" aria-hidden="true">📍</span> ${count} lugar${count === 1 ? "" : "es"} encontrado${count === 1 ? "" : "s"}. ¡Mirá los resultados en <strong>Búsquedas</strong>!</span>
       <span class="found-cta-arrow" aria-hidden="true">👇</span>
     </button>
   `;

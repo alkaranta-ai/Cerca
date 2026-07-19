@@ -1496,7 +1496,6 @@ body.dark {
   cursor: pointer;
   color: var(--ink);
   overflow: hidden;
-  box-shadow: 0 0 16px -4px var(--accent-glow);
   transition: transform 0.1s, box-shadow 0.2s;
 }
 .suggestion-card::after {

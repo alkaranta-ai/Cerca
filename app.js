@@ -979,9 +979,9 @@ function renderResults() {
 
 // ---------- Sugerencia de ampliar radio cuando hay pocos resultados ----------
 function radiusSuggestionBanner() {
-  if (state.radius >= 5000) return "";
+  if (state.radius >= 10000) return "";
   if (state.results.length === 0 || state.results.length < LOW_RESULTS_THRESHOLD) {
-    const next = Math.min(5000, state.radius * 2);
+    const next = Math.min(10000, state.radius * 2);
     return `
       <div class="results-banner">
         <span>${state.results.length === 0 ? "Casi no hay resultados por acá." : "Encontramos pocos lugares."} Probá con más radio.</span>
@@ -1792,7 +1792,7 @@ if (els.suggestionBtn) {
     try {
       const pos = await getPosition();
       const lat = pos.coords.latitude, lon = pos.coords.longitude;
-      const cats = Object.keys(CATEGORY_DEFS);
+      const cats = ["bar", "cafe", "restaurante", "heladeria"];
       const cat = cats[Math.floor(Math.random() * cats.length)];
       const elements = await queryOverpass([cat], lat, lon, 1500);
       const tmpUserLat = state.userLat, tmpUserLon = state.userLon;

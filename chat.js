@@ -13,6 +13,7 @@ const CHAT_CONFIG = {
 };
 
 const chat = {
+  open: false,
   busy: false,
   history: [], // [{role:"user"|"model", parts:[{text}]}]
 };
@@ -78,7 +79,6 @@ async function callGemini() {
 async function sendChatMessage(userText) {
   if (!userText || chat.busy) return;
   chat.busy = true;
-  expandChat();
   appendChatBubble("user", userText);
   chat.history.push({ role: "user", parts: [{ text: userText }] });
   showChatTyping(true);
@@ -124,28 +124,27 @@ function showChatTyping(on) {
   if (on && els.chatMessages) els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
 }
 
-function expandChat() {
-  if (!els.chatDock) return;
-  els.chatDock.classList.add("expanded");
-  els.chatDockHandle && els.chatDockHandle.setAttribute("aria-expanded", "true");
-  if (!els.chatMessages.childElementCount) {
+function openChat() {
+  chat.open = true;
+  if (els.chatOverlay) els.chatOverlay.hidden = false;
+  requestAnimationFrame(() => els.chatOverlay && els.chatOverlay.classList.add("open"));
+  if (els.chatInput) els.chatInput.focus();
+  if (els.chatMessages && !els.chatMessages.childElementCount) {
     appendChatBubble("model", "¡Hola! Preguntame lo que quieras sobre los lugares que ves en pantalla, pedime una recomendación o charlemos del plan de hoy.");
   }
 }
 
-function toggleChat() {
-  if (!els.chatDock) return;
-  const willExpand = !els.chatDock.classList.contains("expanded");
-  els.chatDock.classList.toggle("expanded", willExpand);
-  els.chatDockHandle && els.chatDockHandle.setAttribute("aria-expanded", String(willExpand));
-  if (willExpand && !els.chatMessages.childElementCount) {
-    appendChatBubble("model", "¡Hola! Preguntame lo que quieras sobre los lugares que ves en pantalla, pedime una recomendación o charlemos del plan de hoy.");
-  }
+function closeChat() {
+  chat.open = false;
+  if (els.chatOverlay) els.chatOverlay.classList.remove("open");
+  setTimeout(() => { if (els.chatOverlay && !chat.open) els.chatOverlay.hidden = true; }, 220);
 }
 
 function initChatUI() {
-  els.chatDock = document.getElementById("chatDock");
-  els.chatDockHandle = document.getElementById("chatDockHandle");
+  els.chatFab = document.getElementById("chatFab");
+  els.chatOverlay = document.getElementById("chatOverlay");
+  els.chatPanel = document.getElementById("chatPanel");
+  els.chatClose = document.getElementById("chatClose");
   els.chatMessages = document.getElementById("chatMessages");
   els.chatForm = document.getElementById("chatForm");
   els.chatInput = document.getElementById("chatInput");
@@ -153,10 +152,12 @@ function initChatUI() {
   els.chatTyping = document.getElementById("chatTyping");
   els.chatSuggestions = document.getElementById("chatSuggestions");
 
-  if (!els.chatDock) return; // markup no presente, no rompemos nada
+  if (!els.chatFab) return; // markup no presente, no rompemos nada
 
-  els.chatDockHandle.addEventListener("click", toggleChat);
-  els.chatInput.addEventListener("focus", expandChat);
+  els.chatFab.addEventListener("click", () => (chat.open ? closeChat() : openChat()));
+  els.chatClose.addEventListener("click", closeChat);
+  els.chatOverlay.addEventListener("click", (e) => { if (e.target === els.chatOverlay) closeChat(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && chat.open) closeChat(); });
 
   els.chatForm.addEventListener("submit", (e) => {
     e.preventDefault();

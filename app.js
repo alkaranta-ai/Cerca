@@ -916,6 +916,12 @@ function renderResults() {
         c.facebook ? "👍" : "",
       ].filter(Boolean).join(" ");
       const delay = Math.min(i, 10) * 0.035;
+      const openState = isOpenNow(c.opening);
+      const openChip = openState === true
+        ? `<span class="status-chip status-open">Abierto</span>`
+        : openState === false
+        ? `<span class="status-chip status-closed">Cerrado</span>`
+        : "";
       return `
         <button class="place-card card-enter" type="button" data-id="${p.id}" style="animation-delay:${delay}s">
           ${c.photo ? `<div class="place-thumb"><img src="${c.photo}" alt="" loading="lazy" decoding="async" /></div>` : `<div class="place-badge ${def.badgeClass}">${def.icon}</div>`}
@@ -923,6 +929,7 @@ function renderResults() {
             <p class="place-name">${escapeHtml(p.name)}</p>
             <div class="place-meta">
               <span>${def.label}</span>
+              ${openChip}
               ${p.rating != null ? `<span class="place-rating">⭐ ${p.rating.toFixed(1)}</span>` : ""}
               ${p.address ? `<span>${escapeHtml(p.address)}</span>` : ""}
               ${iconRow ? `<span class="place-icons">${iconRow}</span>` : ""}
@@ -1066,7 +1073,7 @@ function openPlaceSheet(p) {
       </div>
       <button class="sheet-fav-star ${isFav ? "on" : ""}" id="sheetFavBtn" type="button" aria-label="Favorito" aria-pressed="${isFav}">${isFav ? "★" : "☆"}</button>
     </div>
-    ${c.opening ? `<p class="sheet-hours">🕒 ${escapeHtml(c.opening)}${openState === true ? ' <span style="color:var(--c-farmacia)">· Abierto ahora</span>' : openState === false ? ' <span style="color:var(--c-parrilla)">· Cerrado ahora</span>' : ""}</p>` : ""}
+    ${c.opening ? `<p class="sheet-hours">🕒 ${escapeHtml(c.opening)}${openState === true ? ' <span style="color:var(--status-open)">· Abierto ahora</span>' : openState === false ? ' <span style="color:var(--status-closed)">· Cerrado ahora</span>' : ""}</p>` : ""}
     <div class="sheet-actions">${actions.join("")}</div>
     ${(!c.phone && !c.website && !c.instagram && !c.facebook) ? `<p class="sheet-empty-note">Este lugar todavía no tiene datos de contacto cargados en OpenStreetMap.</p>` : ""}
     <div class="sheet-note-wrap">
@@ -1269,15 +1276,16 @@ function renderClusteredMarkers(points) {
     if (group.length === 1) {
       const p = group[0].p;
       const def = CATEGORY_DEFS[p.category] || CATEGORY_DEFS.restaurante;
+      const closed = isOpenNow((p.contact || {}).opening) === false;
       const icon = L.divIcon({
         className: "",
-        html: `<div class="marker-enter" style="font-size:18px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));animation-delay:${delay}s">${def.icon}</div>`,
+        html: `<div class="marker-enter" style="font-size:18px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6))${closed ? " grayscale(0.85)" : ""};opacity:${closed ? 0.55 : 1};animation-delay:${delay}s">${def.icon}</div>`,
         iconSize: [24, 24],
         iconAnchor: [12, 12],
       });
       L.marker([p.lat, p.lon], { icon })
         .addTo(state.markersLayer)
-        .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>${def.label} · ${formatDistance(p.dist)}`);
+        .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>${def.label} · ${formatDistance(p.dist)}${closed ? " · <span style=\"color:var(--status-closed)\">Cerrado</span>" : ""}`);
     } else {
       const latSum = group.reduce((s, g) => s + g.p.lat, 0);
       const lonSum = group.reduce((s, g) => s + g.p.lon, 0);
@@ -1459,7 +1467,11 @@ function openCompareOverlay(places) {
           const def = CATEGORY_DEFS[p.category] || CATEGORY_DEFS.restaurante;
           const dist = state.userLat ? haversine(state.userLat, state.userLon, p.lat, p.lon) : null;
           const openState = isOpenNow((p.contact || {}).opening);
-          const openLabel = openState === true ? "Abierto ahora" : openState === false ? "Cerrado ahora" : "Sin datos de horario";
+          const openLabel = openState === true
+            ? '<span style="color:var(--status-open)">Abierto ahora</span>'
+            : openState === false
+            ? '<span style="color:var(--status-closed)">Cerrado ahora</span>'
+            : "Sin datos de horario";
           return `
             <div class="compare-col">
               <h4>${def.icon} ${escapeHtml(p.name)}</h4>

@@ -20,6 +20,12 @@
   --border-hi: rgba(245,166,35,0.28);
   --hairline:  rgba(255,255,255,0.06);
 
+  /* Estado abierto/cerrado — visible en modo claro y oscuro */
+  --status-open:     #17A85C;
+  --status-open-bg:  rgba(23,168,92,0.16);
+  --status-closed:   #E8483A;
+  --status-closed-bg:rgba(232,72,58,0.14);
+
   /* Categorías — saturadas sobre oscuro */
   --c-bar:          #C778DD;
   --c-cafe:         #C8956A;
@@ -633,7 +639,7 @@ input[type="range"]::-moz-range-thumb {
   font-family: inherit;
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--border-hi);
-  animation: found-cta-in 0.4s cubic-bezier(0.22, 0.61, 0.36, 1), found-cta-pulse 2.2s ease-in-out 0.4s infinite;
+  animation: found-cta-in 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .found-cta:active { transform: scale(0.97); }
 .found-cta-text {
@@ -651,10 +657,6 @@ input[type="range"]::-moz-range-thumb {
 @keyframes found-cta-in {
   from { opacity: 0; transform: translateY(-6px) scale(0.94); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes found-cta-pulse {
-  0%, 100% { box-shadow: inset 0 0 0 1px var(--border-hi), 0 0 0 0 var(--accent-glow); }
-  50%      { box-shadow: inset 0 0 0 1px var(--border-hi), 0 0 0 6px transparent; }
 }
 @keyframes found-cta-bounce {
   0%, 100% { transform: translateY(0); }
@@ -850,6 +852,20 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.status-chip {
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+}
+.status-chip.status-open {
+  color: var(--status-open);
+  background: var(--status-open-bg);
+}
+.status-chip.status-closed {
+  color: var(--status-closed);
+  background: var(--status-closed-bg);
 }
 
 .place-dist {
@@ -1289,6 +1305,11 @@ body.dark {
   --border-hi: rgba(245,166,35,0.28);
   --hairline:  rgba(255,255,255,0.06);
   --shadow-card: 0 2px 12px rgba(0,0,0,0.45);
+
+  --status-open:     #2ED37B;
+  --status-open-bg:  rgba(46,211,123,0.16);
+  --status-closed:   #FF6B5B;
+  --status-closed-bg:rgba(255,107,91,0.16);
 }
 
 /* ─── Ficha de lugar (bottom sheet, estilo iOS 26) ─── */

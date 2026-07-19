@@ -210,12 +210,10 @@ body {
   .glass-thumb { transition: none; }
 }
 
-body:not(.dark) .glass-panel {
-  --glass-bg: rgba(255, 253, 249, 0.55);
-  --glass-bg-strong: rgba(255, 253, 249, 0.72);
-  --glass-border: rgba(255,255,255,0.6);
-  --glass-hi: rgba(255,255,255,0.75);
-}
+/* Los valores de modo claro para --glass-* se definen más abajo,
+   en el bloque general body:not(.dark), para que apliquen a
+   cualquier elemento que use estas variables (tarjetas de
+   resultados incluidas), no solo a .glass-panel. */
 
 /* ─── Topbar / Header ─── */
 .topbar {
@@ -1277,6 +1275,12 @@ body:not(.dark) {
   --shadow-card: 0 2px 10px rgba(0,0,0,0.08);
   --frost-1: rgba(255,255,255,0.45);
   --frost-2: rgba(255,255,255,0.32);
+
+  --glass-bg: rgba(255, 253, 249, 0.72);
+  --glass-bg-strong: rgba(255, 253, 249, 0.86);
+  --glass-border: rgba(26,25,22,0.10);
+  --glass-hi: rgba(255,255,255,0.85);
+  --glass-shadow: 0 4px 18px -6px rgba(26,25,22,0.14), 0 1px 0 0 rgba(255,255,255,0.6) inset;
 }
 body:not(.dark) .blob-a { opacity: 0.6; }
 body:not(.dark) .blob-b { opacity: 0.5; }

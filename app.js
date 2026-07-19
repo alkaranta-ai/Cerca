@@ -134,6 +134,8 @@ const state = {
   map: null,
   markersLayer: null,
   clusterLayer: null,
+  mapaMap: null,
+  mapaMarkersLayer: null,
   activeTab: "inicio",
   history: [],
   favorites: [],
@@ -165,11 +167,14 @@ const els = {
   dock: document.getElementById("dock"),
   dockThumb: document.getElementById("dockThumb"),
   historyBadge: document.getElementById("historyBadge"),
-  favBadge: document.getElementById("favBadge"),
+  favBadge: document.getElementById("favBadgeMenu"),
   viewInicio: document.getElementById("view-inicio"),
   viewBusquedas: document.getElementById("view-busquedas"),
+  viewMapa: document.getElementById("view-mapa"),
+  mapaStatus: document.getElementById("mapaStatus"),
   viewFavoritos: document.getElementById("view-favoritos"),
   viewMenu: document.getElementById("view-menu"),
+  menuFavoritos: document.getElementById("menuFavoritos"),
   historyList: document.getElementById("historyList"),
   savedSearchesList: document.getElementById("savedSearchesList"),
   savedSearchesTitle: document.getElementById("savedSearchesTitle"),
@@ -269,10 +274,12 @@ function switchTab(tab) {
   slideGlassThumb(els.dock, els.dockThumb, activeDock);
   els.viewInicio.hidden = tab !== "inicio";
   els.viewBusquedas.hidden = tab !== "busquedas";
+  els.viewMapa.hidden = tab !== "mapa";
   els.viewFavoritos.hidden = tab !== "favoritos";
   els.viewMenu.hidden = tab !== "menu";
 
   if (tab === "busquedas") { renderHistory(); renderSavedSearches(); }
+  if (tab === "mapa") renderMapaTab();
   if (tab === "favoritos") renderFavorites();
   if (tab === "inicio" && state.view === "map") {
     setTimeout(() => state.map && state.map.invalidateSize(), 50);
@@ -280,6 +287,10 @@ function switchTab(tab) {
   if (tab === "busquedas" && document.getElementById("foundCtaBtn")) {
     setStatus("");
   }
+}
+
+if (els.menuFavoritos) {
+  els.menuFavoritos.addEventListener("click", () => switchTab("favoritos"));
 }
 
 // ---------- UI: radio de búsqueda ----------
@@ -1402,6 +1413,7 @@ function toggleFavorite(p, btnEl) {
   }
   saveFavoritesList();
   updateFavBadge();
+  if (state.mapaMap) updateMapaMarkers();
   const nowFav = isFavorite(p.id);
   document.querySelectorAll(`[data-fav-id="${p.id}"]`).forEach((el) => {
     el.classList.toggle("on", nowFav);
@@ -1691,6 +1703,7 @@ function loadCar() {
 }
 function saveCar() {
   try { localStorage.setItem(CAR_KEY, state.car ? JSON.stringify(state.car) : ""); } catch (e) {}
+  if (state.mapaMap) updateMapaMarkers();
 }
 function updateCarMenuItem() {
   if (!els.menuCarTitle) return;
@@ -2389,6 +2402,105 @@ function initMapIfNeeded() {
   }
 }
 
+// ---------- Vista dedicada: Mapa (posición actual + favoritos, sin pasar por Búsquedas) ----------
+function initMapaMapIfNeeded() {
+  if (state.mapaMap) return;
+  if (typeof L === "undefined") {
+    console.warn("Leaflet no está disponible; el mapa queda deshabilitado.");
+    return;
+  }
+  state.mapaMap = L.map("mapaMap", { zoomControl: true });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors",
+    maxZoom: 19,
+  }).addTo(state.mapaMap);
+  state.mapaMarkersLayer = L.layerGroup().addTo(state.mapaMap);
+  state.mapaMap.setView(
+    state.userLat != null ? [state.userLat, state.userLon] : [-34.6, -58.4],
+    state.userLat != null ? 15 : 4
+  );
+}
+
+async function renderMapaTab() {
+  try {
+    initMapaMapIfNeeded();
+  } catch (err) {
+    console.warn("No se pudo inicializar el mapa", err);
+  }
+  if (!state.mapaMap) return;
+  setTimeout(() => state.mapaMap && state.mapaMap.invalidateSize(), 50);
+
+  if (state.userLat == null) {
+    els.mapaStatus.hidden = false;
+    els.mapaStatus.textContent = "Ubicándote…";
+    try {
+      const pos = await getPosition();
+      state.userLat = pos.coords.latitude;
+      state.userLon = pos.coords.longitude;
+      els.mapaStatus.hidden = true;
+    } catch (err) {
+      els.mapaStatus.textContent = state.favorites.length
+        ? "No pudimos obtener tu ubicación. Te mostramos igual tus favoritos."
+        : "No pudimos obtener tu ubicación, y todavía no tenés favoritos guardados.";
+    }
+  } else {
+    els.mapaStatus.hidden = true;
+  }
+  updateMapaMarkers();
+}
+
+function updateMapaMarkers() {
+  if (!state.mapaMap || !state.mapaMarkersLayer) return;
+  state.mapaMarkersLayer.clearLayers();
+  const bounds = [];
+
+  if (state.userLat != null) {
+    const userIcon = L.divIcon({
+      className: "",
+      html: `<div style="width:16px;height:16px;border-radius:50%;background:#0A84FF;border:2px solid #fff;box-shadow:0 0 0 4px rgba(10,132,255,0.25);"></div>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+    });
+    L.marker([state.userLat, state.userLon], { icon: userIcon })
+      .addTo(state.mapaMarkersLayer)
+      .bindPopup("<strong>Estás acá</strong>");
+    bounds.push([state.userLat, state.userLon]);
+  }
+
+  if (state.car) {
+    const carIcon = L.divIcon({
+      className: "",
+      html: `<div style="font-size:18px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));">🚗</div>`,
+      iconSize: [22, 22],
+      iconAnchor: [11, 11],
+    });
+    L.marker([state.car.lat, state.car.lon], { icon: carIcon })
+      .addTo(state.mapaMarkersLayer)
+      .bindPopup("<strong>Tu auto</strong>");
+    bounds.push([state.car.lat, state.car.lon]);
+  }
+
+  state.favorites.forEach((p) => {
+    const def = CATEGORY_DEFS[p.category] || CATEGORY_DEFS.restaurante;
+    const icon = L.divIcon({
+      className: "",
+      html: `<div class="marker-enter" style="font-size:18px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));">${def.icon}</div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
+    L.marker([p.lat, p.lon], { icon })
+      .addTo(state.mapaMarkersLayer)
+      .bindPopup(`<strong>${escapeHtml(p.name)}</strong><br>${def.label} · ⭐ favorito`);
+    bounds.push([p.lat, p.lon]);
+  });
+
+  if (bounds.length > 1) {
+    state.mapaMap.flyToBounds(bounds, { padding: [30, 30], maxZoom: 16, duration: 0.7 });
+  } else if (bounds.length === 1) {
+    state.mapaMap.flyTo(bounds[0], 15, { duration: 0.7 });
+  }
+}
+
 // ---------- Init ----------
 state.history = loadHistory();
 updateHistoryBadge();
@@ -2481,6 +2593,10 @@ if ("permissions" in navigator && "geolocation" in navigator) {
           (pos) => {
             state.userLat = pos.coords.latitude;
             state.userLon = pos.coords.longitude;
+            if (state.mapaMap) {
+              els.mapaStatus.hidden = true;
+              updateMapaMarkers();
+            }
           },
           () => {},
           { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }

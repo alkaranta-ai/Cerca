@@ -999,6 +999,7 @@ input[type="range"]::-moz-range-thumb {
 /* ─── Mapa ─── */
 .map-wrap { overflow: hidden; padding: 0; margin-top: 10px; }
 #map { height: 60vh; min-height: 360px; width: 100%; border-radius: var(--radius-lg); }
+#mapaMap { height: 65vh; min-height: 400px; width: 100%; border-radius: var(--radius-lg); }
 
 .leaflet-popup-content-wrapper {
   background: var(--frost-1);
@@ -1149,6 +1150,21 @@ input[type="range"]::-moz-range-thumb {
 .menu-item-title { font-weight: 700; font-size: 0.9rem; color: var(--ink); }
 .menu-item-desc  { font-size: 0.74rem; color: var(--ink-dim); }
 .menu-item-chevron { color: var(--ink-faint); font-size: 1rem; flex-shrink: 0; }
+
+.menu-item-badge {
+  flex-shrink: 0;
+  min-width: 18px; height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--c-parrilla);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.menu-item-badge[hidden] { display: none; }
 
 .menu-toggle {
   flex-shrink: 0;

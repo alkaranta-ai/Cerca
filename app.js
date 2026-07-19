@@ -4,7 +4,8 @@
 
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://lz4.overpass-api.de/api/interpreter",
 ];
 
 // Cada categoría define uno o más filtros Overpass (clave/valor exactos
@@ -454,11 +455,34 @@ function getPosition() {
       reject(new Error("no-geolocation"));
       return;
     }
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 12000,
-      maximumAge: 60000,
-    });
+    // Timeout de respaldo: en algunas PWA instaladas (sobre todo iOS) el
+    // navegador a veces no dispara ni el callback ni su propio "timeout"
+    // nativo, y el botón queda girando para siempre. Este watchdog garantiza
+    // que la búsqueda siempre termine, con error, a los 14s como máximo.
+    let settled = false;
+    const watchdog = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      const err = new Error("gps-timeout");
+      err.code = 3;
+      reject(err);
+    }, 14000);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(watchdog);
+        resolve(pos);
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(watchdog);
+        reject(err);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+    );
   });
 }
 
@@ -564,18 +588,26 @@ async function queryOverpass(cats, lat, lon, radius) {
   // Consultamos todos los espejos de Overpass en paralelo y nos quedamos con
   // el primero que responda bien (Promise.any), en vez de ir secuencial:
   // así no dependemos de que el primer endpoint de la lista esté saturado.
-  const attempts = OVERPASS_ENDPOINTS.map((endpoint) =>
-    fetch(endpoint, {
+  // Cada fetch tiene su propio timeout (AbortController): sin esto, si la red
+  // se cuelga sin responder ni fallar, la promesa nunca se resuelve y el botón
+  // de búsqueda queda girando para siempre.
+  const FETCH_TIMEOUT_MS = 15000;
+  const attempts = OVERPASS_ENDPOINTS.map((endpoint) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    return fetch(endpoint, {
       method: "POST",
       body: "data=" + encodeURIComponent(query),
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      signal: controller.signal,
     })
       .then((res) => {
         if (!res.ok) throw new Error("bad-status");
         return res.json();
       })
       .then((json) => json.elements || [])
-  );
+      .finally(() => clearTimeout(timer));
+  });
 
   try {
     return await Promise.any(attempts);

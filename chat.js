@@ -2,16 +2,19 @@
 // Cerca — Chat 100% local (sin IA, sin servidor, sin red)
 // ---------------------------------------------------------
 // Este archivo se carga DESPUÉS de app.js y reutiliza sus funciones
-// globales (state, CATEGORY_DEFS, formatDistance, isOpenNow, runSearch,
-// switchTab) tanto para dar contexto como, en pedidos del tipo "qué
-// tengo cerca" / "buscá bares", para ejecutar la búsqueda real de la
-// app (la misma que dispara el botón "Buscar cerca mío"). No hace
-// ningún fetch propio: todo el texto se arma con reglas en JS, en el
-// propio dispositivo.
+// globales (state, CATEGORY_DEFS, formatDistance, isOpenNow, haversine,
+// escapeHtml, runSearch, switchTab) tanto para dar contexto como para,
+// en pedidos del tipo "qué tengo cerca" / "un café cerca", ejecutar la
+// búsqueda real de la app (la misma que dispara el botón "Buscar cerca
+// mío") y mostrar las 3 ubicaciones más cercanas como tarjetas tocables
+// que abren directo Google Maps. No hace ningún fetch propio: todo el
+// texto y los datos se arman con reglas en JS, en el propio dispositivo.
 
 const chat = {
   open: false,
 };
+
+const CHAT_MAX_PLACES = 3;
 
 // ---------- Utilidades de texto ----------
 function normalizeText(s) {
@@ -32,14 +35,18 @@ function getPool() {
   return pool || [];
 }
 
-function placeLine(p) {
-  const def = CATEGORY_DEFS[p.category] || {};
-  const bits = [`${def.icon || "📍"} ${p.name} — ${def.label || p.category}, ${formatDistance(p.dist)}`];
-  if (p.rating != null) bits.push(`⭐ ${p.rating.toFixed(1)}`);
-  const openState = isOpenNow((p.contact || {}).opening);
-  if (openState === true) bits.push("abierto ahora");
-  if (openState === false) bits.push("cerrado ahora");
-  return bits.join(" · ");
+// Si el lugar no tiene distancia calculada (p.ej. viene de favoritos),
+// la calculamos con la posición actual del usuario si la tenemos.
+function withDistance(p) {
+  if (p.dist != null) return p;
+  if (state.userLat != null && state.userLon != null && p.lat != null && p.lon != null) {
+    return { ...p, dist: haversine(state.userLat, state.userLon, p.lat, p.lon) };
+  }
+  return p;
+}
+
+function mapsUrlFor(p) {
+  return `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`;
 }
 
 // Detecta si el usuario mencionó una categoría conocida
@@ -77,8 +84,44 @@ function isNearbyActionRequest(text) {
   return hasAny(text, actionVerbs) || hasAny(text, nearbyPhrases);
 }
 
+// ---------- Tarjetas de lugares (tocables → abren Maps) ----------
+function placeCardHTML(rawPlace) {
+  const p = withDistance(rawPlace);
+  const def = CATEGORY_DEFS[p.category] || {};
+  const bits = [def.label || p.category];
+  if (p.dist != null) bits.push(formatDistance(p.dist));
+  const openState = isOpenNow((p.contact || {}).opening);
+  if (openState === true) bits.push("abierto ahora");
+  if (openState === false) bits.push("cerrado ahora");
+  if (p.rating != null) bits.push(`⭐ ${p.rating.toFixed(1)}`);
+
+  return `
+    <a class="chat-place-item" href="${mapsUrlFor(p)}" target="_blank" rel="noopener">
+      <span class="chat-place-icon" aria-hidden="true">${def.icon || "📍"}</span>
+      <span class="chat-place-info">
+        <span class="chat-place-name">${escapeHtml(p.name)}</span>
+        <span class="chat-place-meta">${escapeHtml(bits.join(" · "))}</span>
+      </span>
+      <span class="chat-place-go" aria-hidden="true">↗</span>
+    </a>`;
+}
+
+function appendChatPlaces(places) {
+  if (!els.chatMessages || !places.length) return;
+  const div = document.createElement("div");
+  div.className = "chat-bubble chat-bubble-model chat-places";
+  div.innerHTML = places.map(placeCardHTML).join("");
+  els.chatMessages.appendChild(div);
+  els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
+}
+
+function closestPlaces(pool, n = CHAT_MAX_PLACES) {
+  return [...pool].sort((a, b) => a.dist - b.dist).slice(0, n);
+}
+
 // Ejecuta la búsqueda real de la app (misma función que usa el botón
-// "Buscar cerca mío") y arma la respuesta con los resultados frescos.
+// "Buscar cerca mío") y muestra las 3 ubicaciones más cercanas como
+// tarjetas tocables.
 async function runNearbySearchAction(rawText) {
   const text = normalizeText(rawText);
   const cat = matchCategory(text);
@@ -98,39 +141,40 @@ async function runNearbySearchAction(rawText) {
 
   const pool = getPool();
   if (!pool.length) {
-    return "No encontré resultados. Puede ser que hayas rechazado el permiso de ubicación, o que no haya lugares en el radio actual — probá ampliar el radio desde Inicio.";
+    appendChatBubble("model", "No encontré resultados. Puede ser que hayas rechazado el permiso de ubicación, o que no haya lugares en el radio actual — probá ampliar el radio desde Inicio.");
+    return;
   }
-  const top = pool.slice(0, 6).map(placeLine).join("\n");
+  const closest = closestPlaces(pool);
   const catSuffix = cat ? ` de ${CATEGORY_DEFS[cat].label}` : "";
-  return `Encontré ${pool.length} lugar(es) cerca tuyo${catSuffix}:\n${top}`;
+  appendChatBubble("model", `Esto es lo más cerca${catSuffix}. Tocá una para abrir en Maps 👇`);
+  appendChatPlaces(closest);
 }
 
-// ---------- Motor de respuestas ----------
-function buildReply(rawText) {
+// ---------- Motor de respuestas (sin acción, sobre lo que ya hay en pantalla) ----------
+function respondFromPool(rawText) {
   const text = normalizeText(rawText);
   const pool = getPool();
 
   // Saludo
   if (hasAny(text, ["hola", "buenas", "buen dia", "buenas tardes", "buenas noches", "que tal", "ey", "hey"])) {
-    return "¡Hola! 👋 Preguntame por los lugares que ves en pantalla, pedime una recomendación, o consultame por favoritos o cómo usar la app.";
+    appendChatBubble("model", "¡Hola! 👋 Pedime algo como \"un café cerca\" y te muestro las 3 opciones más cercanas para ir directo a Maps. También puedo contarte de tus favoritos o cómo usar la app.");
+    return;
   }
 
   // Agradecimiento / despedida
   if (hasAny(text, ["gracias"])) {
-    return "¡De nada! Si querés otra idea, avisame. 😊";
+    appendChatBubble("model", "¡De nada! Si querés otra idea, avisame. 😊");
+    return;
   }
   if (hasAny(text, ["chau", "adios", "nos vemos"])) {
-    return "¡Dale, que la pases bien! Tocá el botón de cerrar cuando quieras. 👋";
+    appendChatBubble("model", "¡Dale, que la pases bien! Tocá el botón de cerrar cuando quieras. 👋");
+    return;
   }
 
   // Ayuda / cómo usar la app
   if (hasAny(text, ["como busco", "como uso", "como funciona", "ayuda", "como se usa"])) {
-    return "Elegí una o más categorías, ajustá el radio con el control deslizante y tocá \"Buscar cerca mío\". Te va a pedir permiso de ubicación y te muestra los lugares ordenados por distancia, en lista o en mapa.";
-  }
-
-  // Sin resultados todavía + intención de recomendación
-  if (!pool.length && hasAny(text, ["recomend", "sugerime", "sugerencia", "idea", "donde voy", "que hay", "resultado", "cerca", "opcion", "plan"])) {
-    return "Todavía no hiciste una búsqueda. Elegí categoría y radio, y tocá \"Buscar cerca mío\" — ahí te puedo recomendar algo de la lista. 🔍";
+    appendChatBubble("model", "Pedime algo como \"un café cerca\" y yo hago la búsqueda y te muestro las 3 opciones más cercanas para ir directo a Maps. También podés elegir categoría y radio a mano y tocar \"Buscar cerca mío\".");
+    return;
   }
 
   // Categoría específica mencionada
@@ -138,74 +182,83 @@ function buildReply(rawText) {
   if (cat) {
     const def = CATEGORY_DEFS[cat];
     if (!pool.length) {
-      return `Todavía no buscaste nada. Elegí "${def.label}" en las categorías y tocá "Buscar cerca mío" para ver opciones.`;
+      appendChatBubble("model", `Todavía no buscaste nada. Pedime "${def.label.toLowerCase()} cerca" y lo busco por vos, o elegí "${def.label}" en las categorías y tocá "Buscar cerca mío".`);
+      return;
     }
-    const matches = pool.filter((p) => p.category === cat);
+    const matches = closestPlaces(pool.filter((p) => p.category === cat));
     if (!matches.length) {
-      return `No veo ningún lugar de "${def.label}" entre los resultados actuales. Podés sumar esa categoría y volver a buscar.`;
+      appendChatBubble("model", `No veo ningún lugar de "${def.label}" entre los resultados actuales. Pedime "${def.label.toLowerCase()} cerca" para que lo busque de nuevo.`);
+      return;
     }
-    const top = matches.slice(0, 5).map(placeLine).join("\n");
-    return `${def.icon} Encontré esto de ${def.label} cerca:\n${top}`;
+    appendChatBubble("model", `${def.icon} Lo más cerca de ${def.label}. Tocá una para abrir en Maps 👇`);
+    appendChatPlaces(matches);
+    return;
   }
 
   // Favoritos
   if (hasAny(text, ["favorito", "guardado", "guarde"])) {
     if (!state.favorites.length) {
-      return "Todavía no tenés favoritos guardados. Tocá la estrellita en un lugar para agregarlo. ⭐";
+      appendChatBubble("model", "Todavía no tenés favoritos guardados. Tocá la estrellita en un lugar para agregarlo. ⭐");
+      return;
     }
-    const top = state.favorites.slice(0, 8).map((f) => {
-      const def = CATEGORY_DEFS[f.category] || {};
-      return `${def.icon || "📍"} ${f.name} — ${def.label || f.category}`;
-    }).join("\n");
-    return `Tus favoritos:\n${top}`;
+    appendChatBubble("model", "Tus favoritos. Tocá uno para abrir en Maps 👇");
+    appendChatPlaces(state.favorites.slice(0, CHAT_MAX_PLACES));
+    return;
   }
 
   // Más cercano
   if (hasAny(text, ["mas cerca", "mas cercano"])) {
-    if (!pool.length) return "Todavía no hay resultados en pantalla. Hacé una búsqueda primero.";
-    const closest = [...pool].sort((a, b) => a.dist - b.dist)[0];
-    return `Lo más cerca es ${placeLine(closest)}.`;
+    if (!pool.length) { appendChatBubble("model", "Todavía no hay resultados en pantalla. Pedime \"algo cerca\" y lo busco."); return; }
+    appendChatBubble("model", "Lo más cerca. Tocá para abrir en Maps 👇");
+    appendChatPlaces(closestPlaces(pool, 1));
+    return;
   }
 
   // Mejor calificado
   if (hasAny(text, ["mejor calificado", "mejor puntuado", "mas estrellas", "mejor rating", "el mejor"])) {
-    if (!pool.length) return "Todavía no hay resultados en pantalla. Hacé una búsqueda primero.";
+    if (!pool.length) { appendChatBubble("model", "Todavía no hay resultados en pantalla. Pedime \"algo cerca\" y lo busco."); return; }
     const rated = pool.filter((p) => p.rating != null).sort((a, b) => b.rating - a.rating);
-    if (!rated.length) return "Ninguno de los resultados actuales tiene rating cargado en OpenStreetMap.";
-    return `El mejor calificado ahora es ${placeLine(rated[0])}.`;
+    if (!rated.length) { appendChatBubble("model", "Ninguno de los resultados actuales tiene rating cargado en OpenStreetMap."); return; }
+    appendChatBubble("model", "El mejor calificado ahora. Tocá para abrir en Maps 👇");
+    appendChatPlaces(rated.slice(0, 1));
+    return;
   }
 
   // Abierto ahora
   if (hasAny(text, ["abierto ahora", "que este abierto", "esta abierto"])) {
-    if (!pool.length) return "Todavía no hay resultados en pantalla. Hacé una búsqueda primero.";
-    const open = pool.filter((p) => isOpenNow((p.contact || {}).opening) === true);
-    if (!open.length) return "No tengo datos de horario que confirmen cuáles están abiertos ahora mismo entre los resultados actuales.";
-    const top = open.slice(0, 5).map(placeLine).join("\n");
-    return `Estos figuran abiertos ahora:\n${top}`;
+    if (!pool.length) { appendChatBubble("model", "Todavía no hay resultados en pantalla. Pedime \"algo cerca\" y lo busco."); return; }
+    const open = closestPlaces(pool.filter((p) => isOpenNow((p.contact || {}).opening) === true));
+    if (!open.length) { appendChatBubble("model", "No tengo datos de horario que confirmen cuáles están abiertos ahora mismo entre los resultados actuales."); return; }
+    appendChatBubble("model", "Estos figuran abiertos ahora. Tocá uno para abrir en Maps 👇");
+    appendChatPlaces(open);
+    return;
   }
 
-  // Recomendación / idea genérica (con resultados)
+  // Recomendación / idea genérica
   if (hasAny(text, ["recomend", "sugerime", "sugerencia", "idea", "donde voy", "plan", "opcion"])) {
+    if (!pool.length) { appendChatBubble("model", "Todavía no hiciste una búsqueda. Pedime \"algo cerca\" y te tiro una idea."); return; }
     const pick = pool[Math.floor(Math.random() * Math.min(pool.length, 8))];
-    return `Te tiro una idea: ${placeLine(pick)}. ¿Querés que te muestre más opciones de esa categoría?`;
+    appendChatBubble("model", "Te tiro una idea. Tocá para abrir en Maps 👇");
+    appendChatPlaces([pick]);
+    return;
   }
 
   // Resumen de resultados actuales
   if (hasAny(text, ["estos resultados", "que hay", "resultados actuales", "cuantos resultados"])) {
-    if (!pool.length) {
-      return "Todavía no hay resultados en pantalla. Hacé una búsqueda para que te pueda contar qué hay cerca.";
-    }
-    const top = pool.slice(0, 6).map(placeLine).join("\n");
-    return `Hay ${pool.length} resultado(s) ahora. Los más cercanos:\n${top}`;
+    if (!pool.length) { appendChatBubble("model", "Todavía no hay resultados en pantalla. Pedime \"algo cerca\" y hago la búsqueda."); return; }
+    appendChatBubble("model", `Hay ${pool.length} resultado(s) ahora. Los más cercanos 👇`);
+    appendChatPlaces(closestPlaces(pool));
+    return;
   }
 
   // Radio de búsqueda
   if (hasAny(text, ["radio", "distancia de busqueda", "cuanto radio"])) {
-    return `El radio de búsqueda actual es ${formatDistance(state.radius, true)}. Lo podés cambiar con el control deslizante en Inicio.`;
+    appendChatBubble("model", `El radio de búsqueda actual es ${formatDistance(state.radius, true)}. Lo podés cambiar con el control deslizante en Inicio.`);
+    return;
   }
 
   // Fallback
-  return "No estoy seguro de eso 😅 Puedo contarte sobre los resultados en pantalla, recomendarte algo, mostrarte tus favoritos o explicarte cómo usar la app.";
+  appendChatBubble("model", "No estoy seguro de eso 😅 Pedime algo como \"un café cerca\", contame qué buscás, o preguntame por tus favoritos.");
 }
 
 async function sendChatMessage(userText) {
@@ -215,15 +268,13 @@ async function sendChatMessage(userText) {
   els.chatSend && (els.chatSend.disabled = true);
 
   const normalized = normalizeText(userText);
-  let reply;
   if (isNearbyActionRequest(normalized)) {
-    reply = await runNearbySearchAction(userText);
+    await runNearbySearchAction(userText);
   } else {
     // Sin red, sin espera real — un breve delay solo para que se sienta natural
     await new Promise((resolve) => setTimeout(resolve, 220));
-    reply = buildReply(userText);
+    respondFromPool(userText);
   }
-  appendChatBubble("model", reply);
 
   showChatTyping(false);
   els.chatSend && (els.chatSend.disabled = false);
@@ -252,7 +303,7 @@ function openChat() {
   syncChatViewport();
   if (els.chatInput) els.chatInput.focus();
   if (els.chatMessages && !els.chatMessages.childElementCount) {
-    appendChatBubble("model", "¡Hola! 👋 Preguntame \"¿qué tengo cerca?\" y hago la búsqueda por vos, o consultame por los resultados en pantalla, tus favoritos, o cómo usar la app. Todo esto lo resuelvo acá en el celular, sin conexión. 📴");
+    appendChatBubble("model", "¡Hola! 👋 Pedime algo como \"un café cerca\" y hago la búsqueda por vos, mostrándote las 3 opciones más cercanas para ir directo a Maps. Todo esto lo resuelvo acá en el celular, sin conexión. 📴");
   }
 }
 
@@ -294,7 +345,6 @@ function initChatUI() {
   els.chatInput = document.getElementById("chatInput");
   els.chatSend = document.getElementById("chatSend");
   els.chatTyping = document.getElementById("chatTyping");
-  els.chatSuggestions = document.getElementById("chatSuggestions");
 
   if (!els.chatFab) return; // markup no presente, no rompemos nada
 
@@ -310,14 +360,6 @@ function initChatUI() {
     els.chatInput.value = "";
     sendChatMessage(text);
   });
-
-  if (els.chatSuggestions) {
-    els.chatSuggestions.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-chat-suggestion]");
-      if (!btn) return;
-      sendChatMessage(btn.dataset.chatSuggestion);
-    });
-  }
 }
 
 document.addEventListener("DOMContentLoaded", initChatUI);

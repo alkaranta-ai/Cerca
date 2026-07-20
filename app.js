@@ -6,6 +6,7 @@ const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
   "https://lz4.overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
 ];
 
 // Cada categoría define uno o más filtros Overpass (clave/valor exactos
@@ -686,14 +687,25 @@ async function queryOverpass(cats, lat, lon, radius) {
     return fetch(endpoint, {
       method: "POST",
       body: "data=" + encodeURIComponent(query),
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        // Algunos espejos de Overpass (overpass-api.de) empezaron a devolver
+        // 406 Not Acceptable a pedidos sin este header explícito.
+        "Accept": "application/json",
+      },
       signal: controller.signal,
     })
       .then((res) => {
-        if (!res.ok) throw new Error("bad-status");
+        if (!res.ok) throw new Error(`bad-status-${res.status}`);
         return res.json();
       })
       .then((json) => json.elements || [])
+      .catch((err) => {
+        // Promise.any solo expone un AggregateError genérico; logueamos acá
+        // el motivo real de cada espejo para poder diagnosticar en consola.
+        console.warn(`Overpass falló en ${endpoint}:`, err && err.message ? err.message : err);
+        throw err;
+      })
       .finally(() => clearTimeout(timer));
   });
 

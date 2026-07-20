@@ -83,6 +83,30 @@ function listCategoriesText() {
   return Object.values(CATEGORY_DEFS).map((def) => `${def.icon} ${def.label}`).join(" · ");
 }
 
+// ---------- Chips tocables de categoría ----------
+// En vez de (o además de) listar las categorías como texto, las mostramos
+// como botones tocables. Al tocar uno, se comporta igual que si el usuario
+// hubiera escrito el nombre de esa categoría.
+function chatCategoryChipsHTML(catKeys) {
+  const keys = (catKeys && catKeys.length) ? catKeys : Object.keys(CATEGORY_DEFS);
+  return keys
+    .filter((k) => CATEGORY_DEFS[k])
+    .map((k) => {
+      const def = CATEGORY_DEFS[k];
+      return `<button type="button" class="chat-chip" data-cat="${k}">${def.icon} ${def.label}</button>`;
+    })
+    .join("");
+}
+
+function appendChatCategoryChips(catKeys) {
+  if (!els.chatMessages) return;
+  const div = document.createElement("div");
+  div.className = "chat-bubble chat-chips";
+  div.innerHTML = chatCategoryChipsHTML(catKeys);
+  els.chatMessages.appendChild(div);
+  els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
+}
+
 // Detecta si el mensaje pide EJECUTAR una búsqueda ahora (no solo hablar
 // de los resultados que ya están en pantalla).
 function isNearbyActionRequest(text) {
@@ -180,7 +204,8 @@ function respondFromPool(rawText) {
 
   // Ayuda / cómo usar la app
   if (hasAny(text, ["como busco", "como uso", "como funciona", "ayuda", "como se usa"])) {
-    appendChatBubble("model", `Pedime algo como "un café cerca" y yo hago la búsqueda y te muestro las 3 opciones más cercanas para ir directo a Maps. Si no sé qué categoría buscás, te pregunto entre estas:\n${listCategoriesText()}\nTambién podés elegir categoría y radio a mano y tocar "Buscar cerca mío".`);
+    appendChatBubble("model", `Pedime algo como "un café cerca" y yo hago la búsqueda y te muestro las 3 opciones más cercanas para ir directo a Maps. Tocá una categoría o escribí su nombre:`);
+    appendChatCategoryChips();
     return;
   }
 
@@ -243,7 +268,7 @@ function respondFromPool(rawText) {
 
   // Recomendación / idea genérica
   if (hasAny(text, ["recomend", "sugerime", "sugerencia", "idea", "donde voy", "plan", "opcion"])) {
-    if (!pool.length) { appendChatBubble("model", `Todavía no hiciste una búsqueda. Elegí una categoría y te tiro una idea:\n${listCategoriesText()}`); return; }
+    if (!pool.length) { appendChatBubble("model", `Todavía no hiciste una búsqueda. Tocá una categoría y te tiro una idea:`); appendChatCategoryChips(); return; }
     const pick = pool[Math.floor(Math.random() * Math.min(pool.length, 8))];
     appendChatBubble("model", "Te tiro una idea. Tocá para abrir en Maps 👇");
     appendChatPlaces([pick]);
@@ -265,7 +290,8 @@ function respondFromPool(rawText) {
   }
 
   // Fallback
-  appendChatBubble("model", `No estoy seguro de eso 😅 Estas son las categorías que puedo buscar:\n${listCategoriesText()}\nDecime cuál te interesa y te doy las 3 opciones más cerca.`);
+  appendChatBubble("model", `No estoy seguro de eso 😅 Tocá una categoría y te doy las 3 opciones más cerca:`);
+  appendChatCategoryChips();
 }
 
 async function sendChatMessage(userText) {
@@ -283,7 +309,8 @@ async function sendChatMessage(userText) {
       // interesa mostrándole todas las categorías disponibles, en vez de
       // buscar a ciegas en todas.
       await new Promise((resolve) => setTimeout(resolve, 220));
-      appendChatBubble("model", `¿Qué tipo de lugar buscás? Estas son las categorías disponibles:\n${listCategoriesText()}\nDecime una y te doy las 3 opciones más cerca.`);
+      appendChatBubble("model", `¿Qué tipo de lugar buscás? Tocá una categoría:`);
+      appendChatCategoryChips();
     }
   } else {
     // Sin red, sin espera real — un breve delay solo para que se sienta natural
@@ -374,6 +401,15 @@ function initChatUI() {
     if (!text) return;
     els.chatInput.value = "";
     sendChatMessage(text);
+  });
+
+  // Tocar un chip de categoría equivale a escribir su nombre.
+  els.chatMessages.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chat-chip");
+    if (!chip) return;
+    const def = CATEGORY_DEFS[chip.dataset.cat];
+    if (!def) return;
+    sendChatMessage(`${def.label} cerca`);
   });
 }
 

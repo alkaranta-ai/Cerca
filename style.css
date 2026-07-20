@@ -2229,6 +2229,29 @@ body.dark {
 }
 .chat-place-go { flex: none; font-size: 1rem; color: var(--accent); }
 
+.chat-chips {
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chat-chip {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  cursor: pointer;
+}
+.chat-chip:active { transform: scale(0.96); }
+.chat-chip:hover { border-color: var(--accent); }
+
 .chat-form {
   display: flex;
   align-items: center;

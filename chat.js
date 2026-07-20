@@ -112,7 +112,12 @@ function appendChatCategoryChips(catKeys) {
 function isNearbyActionRequest(text) {
   const actionVerbs = ["busca", "buscar", "buscame", "encontrame", "encontrar algo", "mostrame que hay", "dame lugares"];
   const nearbyPhrases = ["tengo cerca", "hay cerca", "cerca mio", "cerca mia", "que hay para mi zona", "algo cerca", "que puedo encontrar"];
-  return hasAny(text, actionVerbs) || hasAny(text, nearbyPhrases);
+  if (hasAny(text, actionVerbs) || hasAny(text, nearbyPhrases)) return true;
+  // Los chips de categoría (y frases del tipo "carnicería cerca") mandan
+  // "<categoría> cerca": si se reconoce la categoría y aparece la palabra
+  // "cerca", también cuenta como pedido de búsqueda real.
+  if (/\bcerca\b/.test(text) && matchCategory(text)) return true;
+  return false;
 }
 
 // ---------- Tarjetas de lugares (tocables → abren Maps) ----------

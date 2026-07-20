@@ -1424,13 +1424,19 @@ function updateMapMarkersInner(fitBounds) {
 
   const userIcon = L.divIcon({
     className: "",
-    html: `<div style="width:16px;height:16px;border-radius:50%;background:#0A84FF;border:2px solid #fff;box-shadow:0 0 0 4px rgba(10,132,255,0.25);"></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
+    html: `<div class="map-user-marker"><div class="map-user-ring"></div><div class="map-user-ring ring-delay"></div><div class="map-user-dot"></div></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
   });
-  L.marker([state.userLat, state.userLon], { icon: userIcon })
+  L.marker([state.userLat, state.userLon], { icon: userIcon, zIndexOffset: 1000 })
     .addTo(state.markersLayer)
-    .bindPopup("<strong>Estás acá</strong>");
+    .bindTooltip("Aquí estoy", {
+      permanent: true,
+      direction: "top",
+      offset: [0, -12],
+      className: "tooltip-here",
+    })
+    .bindPopup("<strong>Aquí estoy</strong>");
 
   if (state.car) {
     const carIcon = L.divIcon({
@@ -1494,7 +1500,7 @@ function renderClusteredMarkers(points) {
       const closed = isOpenNow((p.contact || {}).opening) === false;
       const icon = L.divIcon({
         className: "",
-        html: `<div class="marker-enter" style="font-size:18px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6))${closed ? " grayscale(0.85)" : ""};opacity:${closed ? 0.55 : 1};animation-delay:${delay}s">${def.icon}</div>`,
+        html: `<div class="marker-enter" style="font-size:18px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6))${closed ? " grayscale(0.85)" : ""};opacity:${closed ? 0.55 : 1};animation-delay:${delay}s"><span class="marker-float" style="animation-delay:${delay}s">${def.icon}</span></div>`,
         iconSize: [24, 24],
         iconAnchor: [12, 12],
       });
@@ -2867,13 +2873,19 @@ function updateMapaMarkers() {
   if (state.userLat != null) {
     const userIcon = L.divIcon({
       className: "",
-      html: `<div style="width:16px;height:16px;border-radius:50%;background:#0A84FF;border:2px solid #fff;box-shadow:0 0 0 4px rgba(10,132,255,0.25);"></div>`,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8],
+      html: `<div class="map-user-marker"><div class="map-user-ring"></div><div class="map-user-ring ring-delay"></div><div class="map-user-dot"></div></div>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
     });
-    L.marker([state.userLat, state.userLon], { icon: userIcon })
+    L.marker([state.userLat, state.userLon], { icon: userIcon, zIndexOffset: 1000 })
       .addTo(state.mapaMarkersLayer)
-      .bindPopup("<strong>Estás acá</strong>");
+      .bindTooltip("Aquí estoy", {
+        permanent: true,
+        direction: "top",
+        offset: [0, -12],
+        className: "tooltip-here",
+      })
+      .bindPopup("<strong>Aquí estoy</strong>");
     bounds.push([state.userLat, state.userLon]);
   }
 
@@ -2894,7 +2906,7 @@ function updateMapaMarkers() {
     const def = CATEGORY_DEFS[p.category] || CATEGORY_DEFS.restaurante;
     const icon = L.divIcon({
       className: "",
-      html: `<div class="marker-enter" style="font-size:18px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));">${def.icon}</div>`,
+      html: `<div class="marker-enter" style="font-size:18px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));"><span class="marker-float">${def.icon}</span></div>`,
       iconSize: [24, 24],
       iconAnchor: [12, 12],
     });

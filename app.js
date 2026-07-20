@@ -91,6 +91,18 @@ const CATEGORY_DEFS = {
     badgeClass: "kiosco",
     filters: [`nwr["shop"="kiosk"](around:RADIUS,LAT,LON);`, `nwr["shop"="convenience"]["name"](around:RADIUS,LAT,LON);`],
   },
+  carniceria: {
+    label: "Carnicería",
+    icon: "🥩",
+    badgeClass: "carniceria",
+    filters: [`nwr["shop"="butcher"](around:RADIUS,LAT,LON);`],
+  },
+  verduleria: {
+    label: "Verdulería",
+    icon: "🥬",
+    badgeClass: "verduleria",
+    filters: [`nwr["shop"="greengrocer"](around:RADIUS,LAT,LON);`],
+  },
 };
 
 // Nota: OSM no distingue "farmacia de turno" (guardia) — ese dato no está
